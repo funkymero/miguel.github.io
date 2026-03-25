@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TestMant</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background:#f7f7f7; }
+    h1 { margin-bottom: 10px; }
+    #estado { margin-bottom: 15px; font-weight: bold; }
+    table { border-collapse: collapse; width: 100%; background:#fff; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 14px; }
+    th { background: #eaeaea; }
+  </style>
+</head>
+<body>
+  <h1>Dashboard Mantenciones</h1>
+  <div id="estado">Conectando...</div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>ID_UNICO</th>
+        <th>Tipo_Equipo</th>
+        <th>Marca</th>
+        <th>Modelo</th>
+        <th>Tipo</th>
+        <th>Semana</th>
+        <th>Fecha_Mantencion</th>
+        <th>Proxima_Mantencion</th>
+        <th>Responsable</th>
+      </tr>
+    </thead>
+    <tbody id="tablaBody"></tbody>
+  </table>
+
+  <script>
+    const siteUrl = "https://hexmet-my.sharepoint.com/personal/miguel_pasten_hexagon_com";
+    const listName = "MantenimientosPreventivos";
+
+    const endpoint =
+      `${siteUrl}/_api/web/lists/getbytitle('${listName}')/items` +
+      `?$select=Title,field_1,field_2,field_3,field_4,field_5,field_6,Proxima_Mantencion,field_8&$top=20`;
+
+    function formatFecha(valor) {
+      if (!valor) return "";
+      const fecha = new Date(valor);
+      if (isNaN(fecha)) return valor;
+      if (fecha.getFullYear() <= 1901) return "";
+      return fecha.toLocaleDateString("es-CL");
+    }
+
+    async function cargarDatos() {
+      const estado = document.getElementById("estado");
+      const tablaBody = document.getElementById("tablaBody");
+
+      try {
+        const response = await fetch(endpoint, {
+          method: "GET",
+          headers: {
+            "Accept": "application/json;odata=nometadata"
+          },
+          credentials: "include"
+        });
+
+        if (!response.ok) {
+          throw new Error(`Error HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        estado.textContent = "Conexión correcta";
+
+        tablaBody.innerHTML = "";
+
+        data.value.forEach(item => {
+          const fila = document.createElement("tr");
+          fila.innerHTML = `
+            <td>${item.Title ?? ""}</td>
+            <td>${item.field_1 ?? ""}</td>
+            <td>${item.field_2 ?? ""}</td>
+            <td>${item.field_3 ?? ""}</td>
+            <td>${item.field_4 ?? ""}</td>
+            <td>${item.field_5 ?? ""}</td>
+            <td>${formatFecha(item.field_6)}</td>
+            <td>${formatFecha(item.Proxima_Mantencion)}</td>
+            <td>${item.field_8 ?? ""}</td>
+          `;
+          tablaBody.appendChild(fila);
+        });
+
+      } catch (error) {
+        estado.textContent = "Error de conexión: " + error.message;
+        console.error(error);
+      }
+    }
+
+    cargarDatos();
+  </script>
+</body>
+</html>
