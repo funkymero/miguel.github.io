@@ -34,67 +34,86 @@
     <tbody id="tablaBody"></tbody>
   </table>
 
-  <script>
-    const siteUrl = "https://hexmet-my.sharepoint.com/personal/miguel_pasten_hexagon_com";
-    const listName = "MantenimientosPreventivos";
+ <script src="https://alcdn.msauth.net/browser/2.38.1/js/msal-browser.min.js"></script>
 
-    const endpoint =
-      `${siteUrl}/_api/web/lists/getbytitle('${listName}')/items` +
-      `?$select=Title,field_1,field_2,field_3,field_4,field_5,field_6,Proxima_Mantencion,field_8&$top=20`;
+<script>
+const msalConfig = {
+  auth: {
+    clientId: "b035be0f-afe4-4141-81c6-88cf7a1b5ccf",
+    authority: "https://login.microsoftonline.com/1b16ab3e-b8f6-4fe3-9f3e-2db7fe549f6a",
+    redirectUri: "https://funkymero.github.io/miguel.github.io/prueba_sharepoint.html"
+  },
+  cache: {
+    cacheLocation: "localStorage"
+  }
+};
 
-    function formatFecha(valor) {
-      if (!valor) return "";
-      const fecha = new Date(valor);
-      if (isNaN(fecha)) return valor;
-      if (fecha.getFullYear() <= 1901) return "";
-      return fecha.toLocaleDateString("es-CL");
-    }
+const msalInstance = new msal.PublicClientApplication(msalConfig);
 
-    async function cargarDatos() {
-      const estado = document.getElementById("estado");
-      const tablaBody = document.getElementById("tablaBody");
+const loginRequest = {
+  scopes: ["User.Read", "Sites.Read.All"]
+};
 
-      try {
-        const response = await fetch(endpoint, {
-          method: "GET",
-          headers: {
-            "Accept": "application/json;odata=nometadata"
-          },
-          credentials: "include"
-        });
+async function getToken() {
+  let account = msalInstance.getAllAccounts()[0];
 
-        if (!response.ok) {
-          throw new Error(`Error HTTP ${response.status}`);
-        }
+  if (!account) {
+    const loginResponse = await msalInstance.loginPopup(loginRequest);
+    account = loginResponse.account;
+  }
 
-        const data = await response.json();
-        estado.textContent = "Conexión correcta";
+  try {
+    const tokenResponse = await msalInstance.acquireTokenSilent({
+      ...loginRequest,
+      account
+    });
+    return tokenResponse.accessToken;
+  } catch (e) {
+    const tokenResponse = await msalInstance.acquireTokenPopup(loginRequest);
+    return tokenResponse.accessToken;
+  }
+}
 
-        tablaBody.innerHTML = "";
+async function testGraph() {
+  const estado = document.getElementById("estado");
 
-        data.value.forEach(item => {
-          const fila = document.createElement("tr");
-          fila.innerHTML = `
-            <td>${item.Title ?? ""}</td>
-            <td>${item.field_1 ?? ""}</td>
-            <td>${item.field_2 ?? ""}</td>
-            <td>${item.field_3 ?? ""}</td>
-            <td>${item.field_4 ?? ""}</td>
-            <td>${item.field_5 ?? ""}</td>
-            <td>${formatFecha(item.field_6)}</td>
-            <td>${formatFecha(item.Proxima_Mantencion)}</td>
-            <td>${item.field_8 ?? ""}</td>
-          `;
-          tablaBody.appendChild(fila);
-        });
+  try {
+    estado.textContent = "Autenticando...";
+    const token = await getToken();
 
-      } catch (error) {
-        estado.textContent = "Error de conexión: " + error.message;
-        console.error(error);
+    estado.textContent = "Consultando Graph (/me)...";
+
+    const meResp = await fetch("https://graph.microsoft.com/v1.0/me", {
+      headers: {
+        Authorization: `Bearer ${token}`
       }
-    }
+    });
 
-    cargarDatos();
-  </script>
+    const meData = await meResp.json();
+    console.log("Usuario:", meData);
+
+    estado.textContent = "Buscando sitio SharePoint...";
+
+    const siteResp = await fetch(
+      "https://graph.microsoft.com/v1.0/sites/hexmet-my.sharepoint.com:/personal/miguel_pasten_hexagon_com",
+      {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    );
+
+    const siteData = await siteResp.json();
+    console.log("Sitio:", siteData);
+
+    estado.textContent = "OK: login + Graph funcionando 🚀 (revisa consola)";
+  } catch (err) {
+    estado.textContent = "Error: " + err.message;
+    console.error(err);
+  }
+}
+
+testGraph();
+</script>
 </body>
 </html>
